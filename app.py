@@ -99,6 +99,70 @@ st.markdown("""
         font-family: 'Georgia', serif;
     }
 
+    import plotly.express as px
+
+# -----------------------------------------------------
+# RESEARCH-GRADE VISUALIZATIONS
+# -----------------------------------------------------
+st.markdown("---")
+st.markdown("<h3 class='mono' style='font-size:1.1rem;'>Statistical_Distribution_Audit</h3>", unsafe_allow_html=True)
+
+chart_left, chart_right = st.columns(2, gap="large")
+
+with chart_left:
+    st.markdown('<div class="soft-card">', unsafe_allow_html=True)
+    st.markdown('<div class="mono" style="font-size:0.75rem; color:#94a3b8; margin-bottom:1rem;">[ FIG_01: CASE_TYPE_BREAKDOWN ]</div>', unsafe_allow_html=True)
+    
+    if "case_type" in df.columns:
+        # Tally original data
+        counts = df["case_type"].value_counts().reset_index()
+        counts.columns = ["Type", "Count"]
+        
+        fig_type = px.bar(
+            counts, x="Count", y="Type", orientation='h',
+            color_discrete_sequence=['#9b1c1c'] # Forensic Red
+        )
+        
+        # Style to match Georgia/IBM Plex UI
+        fig_type.update_layout(
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)',
+            font_family="Georgia",
+            font_color="#e2e8f0",
+            margin=dict(l=0, r=0, t=10, b=0),
+            height=250,
+            xaxis=dict(showgrid=True, gridcolor='#1e293b', title=""),
+            yaxis=dict(title="")
+        )
+        st.plotly_chart(fig_type, use_container_width=True, config={'displayModeBar': False})
+    st.markdown('</div>', unsafe_allow_html=True)
+
+with chart_right:
+    st.markdown('<div class="soft-card">', unsafe_allow_html=True)
+    st.markdown('<div class="mono" style="font-size:0.75rem; color:#94a3b8; margin-bottom:1rem;">[ FIG_02: DATA_INTEGRITY_STATUS ]</div>', unsafe_allow_html=True)
+    
+    if "review_needed" in df.columns:
+        # Tally original data
+        quality = df["review_needed"].map({0: "Clean", 1: "Flagged"}).value_counts().reset_index()
+        quality.columns = ["Status", "Count"]
+        
+        fig_qual = px.pie(
+            quality, values="Count", names="Status",
+            color_discrete_sequence=['#475569', '#9b1c1c'], # Slate vs Red
+            hole=0.4
+        )
+        
+        fig_qual.update_layout(
+            paper_bgcolor='rgba(0,0,0,0)',
+            font_family="Georgia",
+            font_color="#e2e8f0",
+            margin=dict(l=0, r=0, t=10, b=0),
+            height=250,
+            showlegend=True
+        )
+        st.plotly_chart(fig_qual, use_container_width=True, config={'displayModeBar': False})
+    st.markdown('</div>', unsafe_allow_html=True)
+
     /* System Buttons */
     .stButton > button {
         width: 100%;
