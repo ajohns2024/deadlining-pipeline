@@ -2,11 +2,10 @@ import streamlit as st
 import tempfile
 import os
 import pandas as pd
-import plotly.express as px
 from pipeline import run_pipeline
 
 # ---------------------------------------------------------
-# CONFIG & AUTHENTICITY
+# CONFIG (Original Names & Icon)
 # ---------------------------------------------------------
 st.set_page_config(
     page_title="Deadlining",
@@ -21,7 +20,7 @@ st.markdown("""
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Inter:wght@300;400;700&family=Playfair+Display:ital,wght@0,700;1,700&display=swap" rel="stylesheet">
 
 <style>
-    /* Obsidian Base with Academic Grid */
+    /* Obsidian Base */
     [data-testid="stAppViewContainer"] {
         background-color: #05070a;
         background-image: radial-gradient(circle at 2px 2px, rgba(255,255,255,0.015) 1px, transparent 0);
@@ -66,6 +65,7 @@ st.markdown("""
         margin: 0 0 0.5rem 0;
     }
 
+    /* Cards */
     .soft-card {
         background: rgba(15, 23, 42, 0.7);
         backdrop-filter: blur(12px);
@@ -75,6 +75,7 @@ st.markdown("""
         margin-bottom: 1rem;
     }
 
+    /* Metric Grids */
     .metric-box {
         background: #0a0f1a;
         border: 1px solid #1e293b;
@@ -98,9 +99,10 @@ st.markdown("""
         font-family: 'Georgia', serif;
     }
 
+    /* System Buttons */
     .stButton > button {
         width: 100%;
-        background: transparent !important;
+        background: transparent;
         border: 1px solid #9b1c1c !important;
         color: #9b1c1c !important;
         font-family: 'IBM Plex Mono', monospace;
@@ -112,6 +114,12 @@ st.markdown("""
     .stButton > button:hover {
         background: #9b1c1c !important;
         color: white !important;
+    }
+
+    /* Sidebar Aesthetic */
+    [data-testid="stSidebar"] {
+        background-color: #030508;
+        border-right: 1px solid #1e293b;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -131,7 +139,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ---------------------------------------------------------
-# TOP LAYOUT
+# TOP LAYOUT (Original Logic)
 # ---------------------------------------------------------
 left, right = st.columns([1.05, 0.95], gap="large")
 
@@ -157,7 +165,7 @@ with right:
     st.markdown('</div>', unsafe_allow_html=True)
 
 # ---------------------------------------------------------
-# PIPELINE EXECUTION logic
+# EXECUTION (Original Names & Variable logic)
 # ---------------------------------------------------------
 if uploaded_file is not None and run_clicked:
     with st.spinner("Processing Forensic Sequence..."):
@@ -181,49 +189,31 @@ if uploaded_file is not None and run_clicked:
     mapped_count = int((df["usable_for_mapping"] == 1).sum()) if "usable_for_mapping" in df.columns else 0
 
     # -----------------------------------------------------
-    # METRICS
+    # METRICS (Original m1-m6 layout)
     # -----------------------------------------------------
     st.markdown("### Dataset Summary")
     m1, m2, m3, m4, m5, m6 = st.columns(6)
-    metrics_list = [
-        ("Total Cases", total_cases), ("Homicides", homicide_count), ("Missing", missing_count),
-        ("Unidentified", unidentified_count), ("Needs Review", review_count), ("Mappable", mapped_count)
+
+    metrics = [
+        ("Total Cases", total_cases),
+        ("Homicides", homicide_count),
+        ("Missing", missing_count),
+        ("Unidentified", unidentified_count),
+        ("Needs Review", review_count),
+        ("Mappable", mapped_count),
     ]
-    for col, (label, value) in zip([m1, m2, m3, m4, m5, m6], metrics_list):
+
+    for col, (label, value) in zip([m1, m2, m3, m4, m5, m6], metrics):
         with col:
-            st.markdown(f'<div class="metric-box"><div class="metric-label">{label}</div><div class="metric-value">{value}</div></div>', unsafe_allow_html=True)
+            st.markdown(f"""
+            <div class="metric-box">
+                <div class="metric-label">{label}</div>
+                <div class="metric-value">{value}</div>
+            </div>
+            """, unsafe_allow_html=True)
 
     # -----------------------------------------------------
-    # RESEARCH AUDIT CHARTS
-    # -----------------------------------------------------
-    st.markdown("---")
-    st.markdown("<h3 class='mono' style='font-size:1.1rem;'>Statistical_Distribution_Audit</h3>", unsafe_allow_html=True)
-    c1, c2 = st.columns(2, gap="large")
-
-    with c1:
-        st.markdown('<div class="soft-card">', unsafe_allow_html=True)
-        st.markdown('<div class="mono" style="font-size:0.75rem; color:#94a3b8; margin-bottom:1rem;">[ FIG_01: CASE_TYPE_BREAKDOWN ]</div>', unsafe_allow_html=True)
-        if "case_type" in df.columns:
-            counts = df["case_type"].value_counts().reset_index()
-            counts.columns = ["Type", "Count"]
-            fig_type = px.bar(counts, x="Count", y="Type", orientation='h', color_discrete_sequence=['#9b1c1c'])
-            fig_type.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font_family="Georgia", font_color="#e2e8f0", height=250, margin=dict(l=0,r=0,t=10,b=0), xaxis=dict(showgrid=True, gridcolor='#1e293b', title=""), yaxis=dict(title=""))
-            st.plotly_chart(fig_type, use_container_width=True, config={'displayModeBar': False})
-        st.markdown('</div>', unsafe_allow_html=True)
-
-    with c2:
-        st.markdown('<div class="soft-card">', unsafe_allow_html=True)
-        st.markdown('<div class="mono" style="font-size:0.75rem; color:#94a3b8; margin-bottom:1rem;">[ FIG_02: DATA_INTEGRITY_STATUS ]</div>', unsafe_allow_html=True)
-        if "review_needed" in df.columns:
-            quality = df["review_needed"].map({0: "Clean", 1: "Flagged"}).value_counts().reset_index()
-            quality.columns = ["Status", "Count"]
-            fig_qual = px.pie(quality, values="Count", names="Status", color_discrete_sequence=['#475569', '#9b1c1c'], hole=0.4)
-            fig_qual.update_layout(paper_bgcolor='rgba(0,0,0,0)', font_family="Georgia", font_color="#e2e8f0", height=250, margin=dict(l=0,r=0,t=10,b=0))
-            st.plotly_chart(fig_qual, use_container_width=True, config={'displayModeBar': False})
-        st.markdown('</div>', unsafe_allow_html=True)
-
-    # -----------------------------------------------------
-    # MAP
+    # MAP (High-Contrast Forensic Map)
     # -----------------------------------------------------
     st.markdown("### Spatial Preview")
     if {"latitude", "longitude"}.issubset(df.columns):
@@ -231,24 +221,64 @@ if uploaded_file is not None and run_clicked:
         map_df["latitude"] = pd.to_numeric(map_df["latitude"], errors="coerce")
         map_df["longitude"] = pd.to_numeric(map_df["longitude"], errors="coerce")
         map_df = map_df.dropna(subset=["latitude", "longitude"])
+        
         if len(map_df) > 0:
+            # Note: Native st.map respects the user's original request but fits the new UI
             st.map(map_df[["latitude", "longitude"]], use_container_width=True)
 
     # -----------------------------------------------------
-    # TABS & DOWNLOADS
+    # TABS (Original Logic)
     # -----------------------------------------------------
     st.markdown("### Review & Data Tables")
     tab1, tab2, tab3 = st.tabs(["All Cases", "Needs Review", "Mappable Cases"])
-    with tab1: st.dataframe(df, use_container_width=True)
-    with tab2: 
-        if "review_needed" in df.columns: st.dataframe(df[df["review_needed"] == 1], use_container_width=True)
-    with tab3:
-        if "usable_for_mapping" in df.columns: st.dataframe(df[df["usable_for_mapping"] == 1], use_container_width=True)
 
+    with tab1:
+        st.dataframe(df, use_container_width=True)
+
+    with tab2:
+        if "review_needed" in df.columns:
+            st.dataframe(df[df["review_needed"] == 1], use_container_width=True)
+
+    with tab3:
+        if "usable_for_mapping" in df.columns:
+            st.dataframe(df[df["usable_for_mapping"] == 1], use_container_width=True)
+
+    # -----------------------------------------------------
+    # EXPORT (Original File Names)
+    # -----------------------------------------------------
     st.markdown("### Export Files")
     d1, d2, d3 = st.columns(3)
-    with d1: st.download_button("Download updated master CSV", df.to_csv(index=False).encode("utf-8"), "cases_master_cleaned_FINAL_UPDATED.csv", "text/csv", use_container_width=True)
-    # (Other download buttons follow original logic...)
+
+    with d1:
+        st.download_button(
+            label="Download updated master CSV",
+            data=df.to_csv(index=False).encode("utf-8"),
+            file_name="cases_master_cleaned_FINAL_UPDATED.csv",
+            mime="text/csv",
+            use_container_width=True
+        )
+
+    with d2:
+        if "review_needed" in df.columns:
+            review_df = df[df["review_needed"] == 1].copy()
+            st.download_button(
+                label="Download needs-review CSV",
+                data=review_df.to_csv(index=False).encode("utf-8"),
+                file_name="cases_needing_review.csv",
+                mime="text/csv",
+                use_container_width=True
+            )
+
+    with d3:
+        if "usable_for_mapping" in df.columns:
+            mappable_df = df[df["usable_for_mapping"] == 1].copy()
+            st.download_button(
+                label="Download mappable cases CSV",
+                data=mappable_df.to_csv(index=False).encode("utf-8"),
+                file_name="cases_mappable.csv",
+                mime="text/csv",
+                use_container_width=True
+            )
 
 elif uploaded_file is None and run_clicked:
     st.warning("Please upload a CSV first.")
