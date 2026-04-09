@@ -95,6 +95,29 @@ NUMERIC_LIKE_COLUMNS = [
     "usable_for_mapping",
 ]
 
+# -----------------------------
+# DC geographic validation
+# -----------------------------
+DC_BOUNDS = {
+    "lat_min": 38.79,
+    "lat_max": 38.995,
+    "lon_min": -77.12,
+    "lon_max": -76.90,
+}
+
+def is_in_dc(lat, lon):
+    if pd.isna(lat) or pd.isna(lon):
+        return False
+    try:
+        lat = float(lat)
+        lon = float(lon)
+    except Exception:
+        return False
+    return (
+        DC_BOUNDS["lat_min"] <= lat <= DC_BOUNDS["lat_max"]
+        and DC_BOUNDS["lon_min"] <= lon <= DC_BOUNDS["lon_max"]
+    )
+
 def clean_text(x):
     if pd.isna(x):
         return pd.NA
@@ -311,29 +334,47 @@ def assign_case_ids_only_to_missing(df):
 def apply_flags(df):
     df = df.copy()
 
+    # Base geographic validation
+    df["in_dc"] = df.apply(lambda row: is_in_dc(row["latitude"], row["longitude"]), axis=1)
+
+    # Anything outside DC should not be mappable
     df["usable_for_mapping"] = np.where(
-        df["latitude"].notna() & df["longitude"].notna(),
+        df["latitude"].notna() & df["longitude"].notna() & df["in_dc"],
         1,
         0,
     )
 
+    # Flag review if core fields missing OR coords outside DC
     df["review_needed"] = np.where(
         df["display_name"].isna() |
         df["raw_address"].isna() |
         df["latitude"].isna() |
-        df["longitude"].isna(),
+        df["longitude"].isna() |
+        (~df["in_dc"]),
         1,
         0,
     )
 
+    # Update review/coordinate flags for outside-DC results
+    outside_dc_mask = df["latitude"].notna() & df["longitude"].notna() & (~df["in_dc"])
+    df.loc[outside_dc_mask, "address_review_flag"] = "review"
+    df.loc[outside_dc_mask, "coordinate_flag"] = "outside_dc"
+
     df["case_validity"] = np.where(
         df["usable_for_mapping"] == 1,
         "valid_spatial_case",
-        "review_required",
+        np.where(
+            outside_dc_mask,
+            "outside_dc_review",
+            "review_required",
+        ),
     )
 
     df["address_review_flag"] = df["address_review_flag"].fillna("review")
     df["coordinate_flag"] = df["coordinate_flag"].fillna("missing")
+
+    # Drop helper column before export so schema stays the same
+    df = df.drop(columns=["in_dc"], errors="ignore")
 
     return df
 
@@ -450,5 +491,11 @@ def run_pipeline(new_file_name, replace_master=False):
 
     print("\nRows needing review:")
     print(combined["review_needed"].value_counts(dropna=False))
+
+    print("\nCoordinate flag counts:")
+    print(combined["coordinate_flag"].value_counts(dropna=False))
+
+    print("\nCase validity counts:")
+    print(combined["case_validity"].value_counts(dropna=False))
 
     return combined
