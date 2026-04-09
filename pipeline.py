@@ -6,7 +6,7 @@ import re
 MASTER_FILE = "cases_master_cleaned_FINAL.csv"
 OUTPUT_FILE = "cases_master_cleaned_FINAL_UPDATED.csv"
 
-MAPBOX_TOKEN = "YOUR_MAPBOX_TOKEN_HERE"
+MAPBOX_TOKEN = "pk.eyJ1IjoiYXZlcnllam9obnMiLCJhIjoiY21uNmo3YnNiMDZrYTJwcTFwcHRzOG83NCJ9.aFx3CE9PzNOHSiDO7cEf2g"
 
 MASTER_COLUMNS = [
     "case_id",
