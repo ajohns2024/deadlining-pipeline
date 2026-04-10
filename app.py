@@ -4,9 +4,6 @@ import os
 import pandas as pd
 from pipeline import run_pipeline
 
-# ---------------------------------------------------------
-# CONFIG
-# ---------------------------------------------------------
 MASTER_CSV = "cases_master_cleaned_FINAL_UPDATED.csv"
 
 st.set_page_config(
@@ -15,16 +12,17 @@ st.set_page_config(
     layout="wide"
 )
 
-# ---------------------------------------------------------
-# MASTER DATA LOADER
-# ---------------------------------------------------------
 @st.cache_data
 def load_master_data():
+    st.write("Looking for:", MASTER_CSV)
+    st.write("Working directory:", os.getcwd())
+    st.write("Visible files:", os.listdir("."))
+    st.write("Exists?", os.path.exists(MASTER_CSV))
+
     if os.path.exists(MASTER_CSV):
         return pd.read_csv(MASTER_CSV)
     return pd.DataFrame()
 
-# initialize displayed dataframe on app open
 if "current_df" not in st.session_state:
     st.session_state.current_df = load_master_data()
 
