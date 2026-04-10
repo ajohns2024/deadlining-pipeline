@@ -14,17 +14,12 @@ st.set_page_config(
 
 @st.cache_data
 def load_master_data():
-    st.write("Looking for:", MASTER_CSV)
-    st.write("Working directory:", os.getcwd())
-    st.write("Visible files:", os.listdir("."))
-    st.write("Exists?", os.path.exists(MASTER_CSV))
-
     if os.path.exists(MASTER_CSV):
         return pd.read_csv(MASTER_CSV)
     return pd.DataFrame()
 
-if "current_df" not in st.session_state:
-    st.session_state.current_df = load_master_data()
+# Always load the current master fresh on app open/reload
+st.session_state.current_df = load_master_data()
 
 # ---------------------------------------------------------
 # FORENSIC STYLING
@@ -181,8 +176,8 @@ if uploaded_file is not None and run_clicked:
 
         try:
             df = run_pipeline(temp_path, replace_master=replace_master)
-            st.session_state.current_df = df
             st.cache_data.clear()
+            st.session_state.current_df = df
         finally:
             if os.path.exists(temp_path):
                 os.remove(temp_path)
@@ -193,7 +188,7 @@ elif uploaded_file is None and run_clicked:
     st.warning("Please upload a CSV first.")
 
 # ---------------------------------------------------------
-# ALWAYS DISPLAY CURRENT MASTER / CURRENT SESSION DATA
+# DISPLAY CURRENT MASTER / CURRENT SESSION DATA
 # ---------------------------------------------------------
 df = st.session_state.current_df
 
