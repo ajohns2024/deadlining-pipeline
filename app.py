@@ -7,7 +7,7 @@ from pipeline import run_pipeline
 # ---------------------------------------------------------
 # CONFIG
 # ---------------------------------------------------------
-MASTER_CSV = "cases_master_cleaned_FINAL_UPDATED.csv"  # use the exact master filename in your repo
+MASTER_CSV = "cases_master_cleaned_FINAL_UPDATED.csv"
 
 st.set_page_config(
     page_title="Deadlining",
