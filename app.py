@@ -12,14 +12,13 @@ st.set_page_config(
     layout="wide"
 )
 
-@st.cache_data
 def load_master_data():
     if os.path.exists(MASTER_CSV):
         return pd.read_csv(MASTER_CSV)
     return pd.DataFrame()
 
-# Always load the current master fresh on app open/reload
-st.session_state.current_df = load_master_data()
+# Always load current master fresh
+df = load_master_data()
 
 # ---------------------------------------------------------
 # FORENSIC STYLING
@@ -176,8 +175,6 @@ if uploaded_file is not None and run_clicked:
 
         try:
             df = run_pipeline(temp_path, replace_master=replace_master)
-            st.cache_data.clear()
-            st.session_state.current_df = df
         finally:
             if os.path.exists(temp_path):
                 os.remove(temp_path)
@@ -188,10 +185,8 @@ elif uploaded_file is None and run_clicked:
     st.warning("Please upload a CSV first.")
 
 # ---------------------------------------------------------
-# DISPLAY CURRENT MASTER / CURRENT SESSION DATA
+# DISPLAY DATA
 # ---------------------------------------------------------
-df = st.session_state.current_df
-
 if df is not None and not df.empty:
     total_cases = len(df)
     homicide_count = int((df["case_type"] == "Homicide").sum()) if "case_type" in df.columns else 0
@@ -286,6 +281,5 @@ if df is not None and not df.empty:
                 mime="text/csv",
                 use_container_width=True
             )
-
 else:
     st.info(f"No master data found yet. Add `{MASTER_CSV}` to the repo, or run the pipeline to generate it.")
