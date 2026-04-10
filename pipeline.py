@@ -1,11 +1,11 @@
+import os
 import pandas as pd
 import numpy as np
 import requests
 import re
 
-MASTER_FILE = "cases_master_cleaned_FINAL.csv"
+MASTER_FILE = "cases_master_cleaned_FINAL_UPDATED.csv"
 OUTPUT_FILE = "cases_master_cleaned_FINAL_UPDATED.csv"
-
 MAPBOX_TOKEN = "pk.eyJ1IjoiYXZlcnllam9obnMiLCJhIjoiY21uNmo3YnNiMDZrYTJwcTFwcHRzOG83NCJ9.aFx3CE9PzNOHSiDO7cEf2g"
 
 MASTER_COLUMNS = [
@@ -95,15 +95,13 @@ NUMERIC_LIKE_COLUMNS = [
     "usable_for_mapping",
 ]
 
-# -----------------------------
-# DC geographic validation
-# -----------------------------
 DC_BOUNDS = {
     "lat_min": 38.79,
     "lat_max": 38.995,
     "lon_min": -77.12,
     "lon_max": -76.90,
 }
+
 
 def is_in_dc(lat, lon):
     if pd.isna(lat) or pd.isna(lon):
@@ -118,12 +116,14 @@ def is_in_dc(lat, lon):
         and DC_BOUNDS["lon_min"] <= lon <= DC_BOUNDS["lon_max"]
     )
 
+
 def clean_text(x):
     if pd.isna(x):
         return pd.NA
     x = str(x).strip()
     x = re.sub(r"\s+", " ", x)
     return x if x else pd.NA
+
 
 def split_display_name(display_name):
     if pd.isna(display_name):
@@ -137,6 +137,7 @@ def split_display_name(display_name):
         return parts[0], pd.NA
     return parts[0], parts[-1]
 
+
 def normalize_name(first_name, last_name, display_name):
     if pd.notna(first_name) or pd.notna(last_name):
         full = f"{'' if pd.isna(first_name) else first_name} {'' if pd.isna(last_name) else last_name}".strip()
@@ -144,6 +145,7 @@ def normalize_name(first_name, last_name, display_name):
         full = "" if pd.isna(display_name) else str(display_name).strip()
     full = re.sub(r"\s+", " ", full).lower()
     return full if full else pd.NA
+
 
 def standardize_case_type(x):
     if pd.isna(x):
@@ -175,6 +177,7 @@ def standardize_case_type(x):
 
     return raw_title
 
+
 def infer_case_type(row):
     existing = clean_text(row.get("case_type", pd.NA))
     if pd.notna(existing):
@@ -204,6 +207,7 @@ def infer_case_type(row):
 
     return existing if pd.notna(existing) else pd.NA
 
+
 def enforce_schema_dtypes(df):
     df = df.copy()
     for col in TEXT_LIKE_COLUMNS:
@@ -213,6 +217,7 @@ def enforce_schema_dtypes(df):
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce")
     return df
+
 
 def fill_name_parts_from_display(df):
     df = df.copy()
@@ -237,6 +242,7 @@ def fill_name_parts_from_display(df):
     )
 
     return df
+
 
 def geocode_mapbox(address):
     if pd.isna(address) or not str(address).strip():
@@ -295,6 +301,7 @@ def geocode_mapbox(address):
             "coordinate_flag": "error",
         }
 
+
 def assign_case_ids_only_to_missing(df):
     df = df.copy()
 
@@ -331,20 +338,18 @@ def assign_case_ids_only_to_missing(df):
 
     return df
 
+
 def apply_flags(df):
     df = df.copy()
 
-    # Base geographic validation
     df["in_dc"] = df.apply(lambda row: is_in_dc(row["latitude"], row["longitude"]), axis=1)
 
-    # Anything outside DC should not be mappable
     df["usable_for_mapping"] = np.where(
         df["latitude"].notna() & df["longitude"].notna() & df["in_dc"],
         1,
         0,
     )
 
-    # Flag review if core fields missing OR coords outside DC
     df["review_needed"] = np.where(
         df["display_name"].isna() |
         df["raw_address"].isna() |
@@ -355,7 +360,6 @@ def apply_flags(df):
         0,
     )
 
-    # Update review/coordinate flags for outside-DC results
     outside_dc_mask = df["latitude"].notna() & df["longitude"].notna() & (~df["in_dc"])
     df.loc[outside_dc_mask, "address_review_flag"] = "review"
     df.loc[outside_dc_mask, "coordinate_flag"] = "outside_dc"
@@ -373,15 +377,19 @@ def apply_flags(df):
     df["address_review_flag"] = df["address_review_flag"].fillna("review")
     df["coordinate_flag"] = df["coordinate_flag"].fillna("missing")
 
-    # Drop helper column before export so schema stays the same
     df = df.drop(columns=["in_dc"], errors="ignore")
 
     return df
 
+
 def run_pipeline(new_file_name, replace_master=False):
     print("Loading files...")
 
-    master = pd.read_csv(MASTER_FILE)
+    if os.path.exists(MASTER_FILE):
+        master = pd.read_csv(MASTER_FILE)
+    else:
+        master = pd.DataFrame(columns=MASTER_COLUMNS)
+
     new = pd.read_csv(new_file_name)
 
     for col in MASTER_COLUMNS:
@@ -454,7 +462,11 @@ def run_pipeline(new_file_name, replace_master=False):
             if col in geocoded.columns:
                 new.loc[to_geocode_mask, col] = geocoded[col].values
 
-    combined = pd.concat([master, new], ignore_index=True)
+    if replace_master:
+        combined = new.copy()
+    else:
+        combined = pd.concat([master, new], ignore_index=True)
+
     combined = enforce_schema_dtypes(combined)
 
     for col in combined.columns:
@@ -478,9 +490,6 @@ def run_pipeline(new_file_name, replace_master=False):
     combined = combined[MASTER_COLUMNS]
 
     combined.to_csv(OUTPUT_FILE, index=False)
-
-    if replace_master:
-        combined.to_csv(MASTER_FILE, index=False)
 
     print("\nPipeline complete.")
     print(f"Updated master saved as: {OUTPUT_FILE}")
