@@ -5,8 +5,10 @@ import pandas as pd
 from pipeline import run_pipeline
 
 # ---------------------------------------------------------
-# CONFIG (Original Names & Icon)
+# CONFIG
 # ---------------------------------------------------------
+MASTER_CSV = "cases_master_cleaned_FINAL_UPDATED.csv"  # use the exact master filename in your repo
+
 st.set_page_config(
     page_title="Deadlining",
     page_icon="🗂️",
@@ -14,20 +16,31 @@ st.set_page_config(
 )
 
 # ---------------------------------------------------------
-# FORENSIC STYLING (The "Pretty" Part)
+# MASTER DATA LOADER
+# ---------------------------------------------------------
+@st.cache_data
+def load_master_data():
+    if os.path.exists(MASTER_CSV):
+        return pd.read_csv(MASTER_CSV)
+    return pd.DataFrame()
+
+# initialize displayed dataframe on app open
+if "current_df" not in st.session_state:
+    st.session_state.current_df = load_master_data()
+
+# ---------------------------------------------------------
+# FORENSIC STYLING
 # ---------------------------------------------------------
 st.markdown("""
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Inter:wght@300;400;700&family=Playfair+Display:ital,wght@0,700;1,700&display=swap" rel="stylesheet">
 
 <style>
-    /* Obsidian Base */
     [data-testid="stAppViewContainer"] {
         background-color: #05070a;
         background-image: radial-gradient(circle at 2px 2px, rgba(255,255,255,0.015) 1px, transparent 0);
         background-size: 32px 32px;
     }
 
-    /* Typography: Georgia for Serifs, IBM Plex Mono for Technicals */
     html, body, [class*="css"] {
         font-family: 'Inter', sans-serif;
         color: #e2e8f0;
@@ -38,11 +51,10 @@ st.markdown("""
         letter-spacing: 0.05em;
     }
 
-    /* Forensic Hero Header */
     .hero {
         padding: 2.5rem 2rem;
         border: 1px solid rgba(255,255,255,0.08);
-        border-left: 5px solid #9b1c1c; /* Forensic Red */
+        border-left: 5px solid #9b1c1c;
         background: linear-gradient(135deg, rgba(15,23,42,0.9), rgba(10,15,28,0.95));
         border-radius: 4px;
         margin-bottom: 2rem;
@@ -65,7 +77,6 @@ st.markdown("""
         margin: 0 0 0.5rem 0;
     }
 
-    /* Cards */
     .soft-card {
         background: rgba(15, 23, 42, 0.7);
         backdrop-filter: blur(12px);
@@ -75,7 +86,6 @@ st.markdown("""
         margin-bottom: 1rem;
     }
 
-    /* Metric Grids */
     .metric-box {
         background: #0a0f1a;
         border: 1px solid #1e293b;
@@ -99,7 +109,6 @@ st.markdown("""
         font-family: 'Georgia', serif;
     }
 
-    /* System Buttons */
     .stButton > button {
         width: 100%;
         background: transparent;
@@ -116,7 +125,6 @@ st.markdown("""
         color: white !important;
     }
 
-    /* Sidebar Aesthetic */
     [data-testid="stSidebar"] {
         background-color: #030508;
         border-right: 1px solid #1e293b;
@@ -139,7 +147,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ---------------------------------------------------------
-# TOP LAYOUT (Original Logic)
+# TOP LAYOUT
 # ---------------------------------------------------------
 left, right = st.columns([1.05, 0.95], gap="large")
 
@@ -165,22 +173,33 @@ with right:
     st.markdown('</div>', unsafe_allow_html=True)
 
 # ---------------------------------------------------------
-# EXECUTION (Original Names & Variable logic)
+# EXECUTION
 # ---------------------------------------------------------
 if uploaded_file is not None and run_clicked:
     with st.spinner("Processing Forensic Sequence..."):
         with tempfile.NamedTemporaryFile(delete=False, suffix=".csv") as tmp:
             tmp.write(uploaded_file.getbuffer())
             temp_path = tmp.name
+
         try:
             df = run_pipeline(temp_path, replace_master=replace_master)
+            st.session_state.current_df = df
+            st.cache_data.clear()
         finally:
             if os.path.exists(temp_path):
                 os.remove(temp_path)
 
     st.success("Sequence Complete.")
 
-    # Prep Original Summary Values
+elif uploaded_file is None and run_clicked:
+    st.warning("Please upload a CSV first.")
+
+# ---------------------------------------------------------
+# ALWAYS DISPLAY CURRENT MASTER / CURRENT SESSION DATA
+# ---------------------------------------------------------
+df = st.session_state.current_df
+
+if df is not None and not df.empty:
     total_cases = len(df)
     homicide_count = int((df["case_type"] == "Homicide").sum()) if "case_type" in df.columns else 0
     missing_count = int((df["case_type"] == "Missing").sum()) if "case_type" in df.columns else 0
@@ -188,9 +207,6 @@ if uploaded_file is not None and run_clicked:
     review_count = int((df["review_needed"] == 1).sum()) if "review_needed" in df.columns else 0
     mapped_count = int((df["usable_for_mapping"] == 1).sum()) if "usable_for_mapping" in df.columns else 0
 
-    # -----------------------------------------------------
-    # METRICS (Original m1-m6 layout)
-    # -----------------------------------------------------
     st.markdown("### Dataset Summary")
     m1, m2, m3, m4, m5, m6 = st.columns(6)
 
@@ -212,23 +228,20 @@ if uploaded_file is not None and run_clicked:
             </div>
             """, unsafe_allow_html=True)
 
-    # -----------------------------------------------------
-    # MAP (High-Contrast Forensic Map)
-    # -----------------------------------------------------
     st.markdown("### Spatial Preview")
     if {"latitude", "longitude"}.issubset(df.columns):
         map_df = df.copy()
         map_df["latitude"] = pd.to_numeric(map_df["latitude"], errors="coerce")
         map_df["longitude"] = pd.to_numeric(map_df["longitude"], errors="coerce")
         map_df = map_df.dropna(subset=["latitude", "longitude"])
-        
-        if len(map_df) > 0:
-            # Note: Native st.map respects the user's original request but fits the new UI
-            st.map(map_df[["latitude", "longitude"]], use_container_width=True)
 
-    # -----------------------------------------------------
-    # TABS (Original Logic)
-    # -----------------------------------------------------
+        if len(map_df) > 0:
+            st.map(map_df[["latitude", "longitude"]], use_container_width=True)
+        else:
+            st.info("No valid coordinates available for mapping yet.")
+    else:
+        st.info("Latitude/longitude columns not found.")
+
     st.markdown("### Review & Data Tables")
     tab1, tab2, tab3 = st.tabs(["All Cases", "Needs Review", "Mappable Cases"])
 
@@ -238,14 +251,15 @@ if uploaded_file is not None and run_clicked:
     with tab2:
         if "review_needed" in df.columns:
             st.dataframe(df[df["review_needed"] == 1], use_container_width=True)
+        else:
+            st.info("No review flag column found.")
 
     with tab3:
         if "usable_for_mapping" in df.columns:
             st.dataframe(df[df["usable_for_mapping"] == 1], use_container_width=True)
+        else:
+            st.info("No mappable flag column found.")
 
-    # -----------------------------------------------------
-    # EXPORT (Original File Names)
-    # -----------------------------------------------------
     st.markdown("### Export Files")
     d1, d2, d3 = st.columns(3)
 
@@ -253,7 +267,7 @@ if uploaded_file is not None and run_clicked:
         st.download_button(
             label="Download updated master CSV",
             data=df.to_csv(index=False).encode("utf-8"),
-            file_name="cases_master_cleaned_FINAL_UPDATED.csv",
+            file_name=MASTER_CSV,
             mime="text/csv",
             use_container_width=True
         )
@@ -280,5 +294,5 @@ if uploaded_file is not None and run_clicked:
                 use_container_width=True
             )
 
-elif uploaded_file is None and run_clicked:
-    st.warning("Please upload a CSV first.")
+else:
+    st.info(f"No master data found yet. Add `{MASTER_CSV}` to the repo, or run the pipeline to generate it.")
